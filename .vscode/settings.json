@@ -1,0 +1,4 @@
+{
+    "python.defaultInterpreterPath": "${workspaceFolder}/myworld/Scripts/python.exe",
+    "pyre.pythonExecutable": "${workspaceFolder}/myworld/Scripts/python.exe"
+}

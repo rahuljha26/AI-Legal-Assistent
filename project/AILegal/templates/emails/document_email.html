@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; background-color: #f8fafc; margin: 0; padding: 20px; }
+    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+    .header { background-color: #0f172a; padding: 24px; text-align: center; border-bottom: 3px solid #1d4ed8; }
+    .header h1 { color: #ffffff; margin: 0; font-size: 20px; font-weight: bold; }
+    .content { padding: 32px 24px; }
+    
+    .intro { font-size: 15px; color: #1e293b; margin-bottom: 24px; line-height: 1.5; }
+    
+    .paper-box { background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); margin-bottom: 24px; }
+    .paper-date { text-align: right; color: #64748b; font-size: 12px; margin-bottom: 16px; }
+    .paper-title { text-align: center; font-weight: bold; text-decoration: underline; font-size: 15px; color: #0f172a; margin-bottom: 20px; text-transform: uppercase; }
+    .paper-body { font-family: "Courier New", Courier, monospace; font-size: 13px; line-height: 1.6; color: #334155; white-space: pre-wrap; margin-bottom: 32px; }
+    
+    .download-note { background-color: #1d4ed8; color: #ffffff; padding: 16px; border-radius: 6px; text-align: center; font-size: 14px; font-weight: bold; margin-bottom: 16px; }
+    
+    .footer { background-color: #f8fafc; padding: 24px; text-align: center; font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; }
+    .footer p { margin: 0 0 8px 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1 style="color: #ffffff;">⚖️ AI Legal Assistant</h1>
+    </div>
+    
+    <div class="content">
+      <div class="intro">
+        Dear {{ user_name }},<br><br>
+        Your legal document has been generated successfully.
+      </div>
+      
+      <div class="download-note">
+        📥 Your document is attached as a PDF. Open it to view the full formatted version.
+      </div>
+
+      <div class="paper-box">
+        <div class="paper-title">{{ document_type }}</div>
+        <div class="paper-body">{{ document_text|truncatechars:1000 }}</div>
+        <p style="text-align:center;font-size:11px;color:#94a3b8;margin-top:20px;">(Preview truncated. See attached PDF for full document.)</p>
+      </div>
+    </div>
+    
+    <div class="footer">
+      <p>AI Legal Assistant — Powered by Gemini AI</p>
+      <p>This email was sent from an automated system. Do not reply.</p>
+    </div>
+  </div>
+</body>
+</html>

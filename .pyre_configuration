@@ -1,0 +1,8 @@
+{
+  "source_directories": [
+    "project"
+  ],
+  "search_path": [
+    "myworld/Lib/site-packages"
+  ]
+}

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; background-color: #f8fafc; margin: 0; padding: 20px; }
+    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+    .header { background-color: #0f172a; padding: 24px; text-align: center; border-bottom: 3px solid #7c3aed; }
+    .header h1 { color: #ffffff; margin: 0; font-size: 20px; font-weight: bold; }
+    .content { padding: 32px 24px; }
+    
+    .intro { font-size: 15px; color: #1e293b; margin-bottom: 24px; }
+    
+    table { width: 100%; border-collapse: collapse; margin-bottom: 24px; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden; }
+    th, td { padding: 12px 16px; text-align: left; font-size: 13px; }
+    th { background-color: #f8fafc; color: #64748b; width: 35%; font-weight: bold; border-bottom: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; }
+    td { color: #0f172a; border-bottom: 1px solid #e2e8f0; font-weight: 500; }
+    
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 100px; font-size: 11px; font-weight: bold; background-color: #f1f5f9; color: #475569; }
+    .badge-green { background-color: #dcfce7; color: #15803d; }
+    .badge-amber { background-color: #fef3c7; color: #b45309; }
+    
+    .steps-box { padding: 16px; border-left: 4px solid #7c3aed; background-color: #faf5ff; border-radius: 4px; }
+    .steps-box h4 { margin: 0 0 12px 0; color: #5b21b6; font-size: 14px; }
+    
+    .steps-list { margin: 0; padding-left: 20px; color: #3b0764; font-size: 13px; }
+    .steps-list li { margin-bottom: 6px; }
+    
+    .ai-draft { font-size: 14px; color: #334155; line-height: 1.6; margin: 24px 0; white-space: pre-line; }
+    
+    .footer { background-color: #f8fafc; padding: 24px; text-align: center; font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; }
+    .footer p { margin: 0 0 8px 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1 style="color: #ffffff;">⚖️ AI Legal Assistant</h1>
+    </div>
+    
+    <div class="content">
+      <div class="intro">
+        Dear Adv. {{ advocate_name }},<br><br>
+        Here is the automated summary for your requested case details:
+      </div>
+
+      {% if ai_drafted_body %}
+      <div class="ai-draft">
+        {{ ai_drafted_body }}
+      </div>
+      {% endif %}
+
+      <table>
+        <tr>
+          <th>Client Name</th>
+          <td>{{ client_name }}</td>
+        </tr>
+        <tr>
+          <th>Case Type</th>
+          <td>{{ case_type }}</td>
+        </tr>
+        <tr>
+          <th>Status</th>
+          <td><span class="badge badge-green">{{ status|default:"Active" }}</span></td>
+        </tr>
+      </table>
+
+      {% if next_steps %}
+      <div class="steps-box">
+        <h4>Upcoming Actions</h4>
+        <ul class="steps-list">
+          {% for step in next_steps %}
+          <li>{{ step }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+    </div>
+    
+    <div class="footer">
+      <p>AI Legal Assistant — Advocate Tools</p>
+      <p>This email was sent from an automated system. Do not reply.</p>
+    </div>
+  </div>
+</body>
+</html>

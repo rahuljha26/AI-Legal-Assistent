@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; background-color: #f8fafc; margin: 0; padding: 20px; }
+    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+    .header { background-color: #0f172a; padding: 24px; text-align: center; border-bottom: 3px solid #1d4ed8; }
+    .header h1 { color: #ffffff; margin: 0; font-size: 20px; font-weight: bold; }
+    .content { padding: 32px 24px; }
+    .greeting { font-size: 16px; color: #1e293b; margin-bottom: 24px; }
+    
+    .box { background-color: #eff6ff; border-left: 4px solid #1d4ed8; padding: 16px; margin-bottom: 20px; border-radius: 4px; }
+    .box-label { text-transform: uppercase; font-size: 11px; color: #64748b; font-weight: bold; margin-bottom: 4px; letter-spacing: 0.5px; }
+    .box-value { font-size: 14px; color: #0f172a; font-weight: bold; margin: 0; }
+    
+    .section-title { font-size: 15px; color: #0f172a; font-weight: bold; margin: 24px 0 12px 0; }
+    
+    .steps-list { margin: 0; padding-left: 20px; color: #1e293b; font-size: 13px; line-height: 1.6; }
+    .steps-list li { margin-bottom: 8px; }
+    
+    .docs-list { margin: 0; padding-left: 0; list-style: none; }
+    .docs-list li { font-size: 13px; color: #1e293b; margin-bottom: 8px; padding-left: 16px; position: relative; }
+    .docs-list li::before { content: "▪"; color: #1d4ed8; position: absolute; left: 0; top: 0; font-size: 14px; }
+    
+    .where-box { background-color: #dbeafe; padding: 16px; border-radius: 6px; margin: 24px 0; }
+    .where-box h4 { margin: 0 0 8px 0; font-size: 13px; color: #1e40af; }
+    .where-box p { margin: 0; font-size: 15px; font-weight: bold; color: #1e3a8a; }
+    
+    .ai-draft { font-size: 14px; color: #334155; line-height: 1.6; margin: 24px 0; white-space: pre-line; }
+    
+    .disclaimer { background-color: #f1f5f9; padding: 16px; border-radius: 6px; font-size: 12px; font-style: italic; color: #64748b; margin-top: 32px; }
+    
+    .footer { background-color: #f8fafc; padding: 24px; text-align: center; font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; }
+    .footer p { margin: 0 0 8px 0; }
+    .footer a { color: #94a3b8; text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1 style="color: #ffffff;">⚖️ AI Legal Assistant</h1>
+    </div>
+    
+    <div class="content">
+      <div class="greeting">
+        <p style="margin: 0 0 8px 0;">Dear {{ user_name }},</p>
+        <p style="margin: 0; color: #475569;">Thank you for using AI Legal Assistant. Here is your legal guidance:</p>
+      </div>
+
+      {% if ai_drafted_body %}
+      <div class="ai-draft">
+        {{ ai_drafted_body }}
+      </div>
+      {% endif %}
+      
+      {% if constitution_reference %}
+      <div class="box">
+        <div class="box-label">Constitution Reference</div>
+        <div class="box-value">{{ constitution_reference }}</div>
+      </div>
+      {% endif %}
+      
+      {% if applicable_law %}
+      <div class="box">
+        <div class="box-label">Applicable Law</div>
+        <div class="box-value">{{ applicable_law }}</div>
+      </div>
+      {% endif %}
+      
+      {% if steps_to_take %}
+      <h3 class="section-title">What You Should Do</h3>
+      <ol class="steps-list">
+        {% for step in steps_to_take %}
+        <li>{{ step }}</li>
+        {% endfor %}
+      </ol>
+      {% endif %}
+      
+      {% if documents_required %}
+      <h3 class="section-title">Documents You Will Need</h3>
+      <ul class="docs-list">
+        {% for doc in documents_required %}
+        <li>{{ doc }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+      
+      {% if where_to_file %}
+      <div class="where-box">
+        <h4>Where to File Your Complaint:</h4>
+        <p>{{ where_to_file }}</p>
+      </div>
+      {% endif %}
+      
+      {% if disclaimer %}
+      <div class="disclaimer">
+        {{ disclaimer }}
+      </div>
+      {% endif %}
+    </div>
+    
+    <div class="footer">
+      <p>AI Legal Assistant — Powered by Gemini AI</p>
+      <p>This email was sent from an automated system. Do not reply.</p>
+    </div>
+  </div>
+</body>
+</html>

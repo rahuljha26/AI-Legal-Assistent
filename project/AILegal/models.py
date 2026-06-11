@@ -139,3 +139,25 @@ class EmailLog(models.Model):
 
     def __str__(self):
         return f"Email ({self.email_type}) to {self.to_email} - {self.status}"
+
+
+class ConstitutionArticle(models.Model):
+    """
+    Stores all articles of the Constitution of India.
+    Used by Gemini AI as context for legal queries and by ConstitutionPage for search.
+    """
+    article_number = models.CharField(max_length=30, unique=True, db_index=True)
+    title = models.CharField(max_length=500)
+    part = models.CharField(max_length=200)
+    part_number = models.CharField(max_length=10)
+    tags = models.JSONField(default=list)          # e.g. ["Fundamental Rights", "Part III"]
+    short_description = models.TextField()
+    full_text = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'constitution_articles'
+        ordering = ['id']
+
+    def __str__(self):
+        return f"{self.article_number} — {self.title}"

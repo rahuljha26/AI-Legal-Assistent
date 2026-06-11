@@ -3,11 +3,13 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 from .views import (
     SignupView, LoginView, ProfileView, ChangePasswordView, LogoutView, GoogleAuthView,
-    AdviceAskView, AdviceHistoryView, AdviceDetailView,
+    AdviceAskView, AdviceHistoryView, AdviceDetailView, AdvicePDFView,
     DocumentGenerateView, DocumentListView, DocumentDetailView, DocumentPDFView,
     CaseListCreateView, CaseDetailView,
     EmailSendView,
     AdminUsersView, AdminUserVerifyView, AdminUserDeleteView, AdminStatsView,
+    IKSearchView, IKDocView, IKCitationsView, IKCitedByView,
+    ConstitutionSearchView,
 )
 
 urlpatterns = [
@@ -24,6 +26,7 @@ urlpatterns = [
     path('advice/ask/', AdviceAskView.as_view(), name='advice_ask'),
     path('advice/history/', AdviceHistoryView.as_view(), name='advice_history'),
     path('advice/<int:pk>/', AdviceDetailView.as_view(), name='advice_detail'),
+    path('advice/<int:pk>/pdf/', AdvicePDFView.as_view(), name='advice_pdf'),
 
     # Documents
     path('documents/generate/', DocumentGenerateView.as_view(), name='documents_generate'),
@@ -43,4 +46,13 @@ urlpatterns = [
     path('admin/users/<int:pk>/verify/', AdminUserVerifyView.as_view(), name='admin_user_verify'),
     path('admin/users/<int:pk>/', AdminUserDeleteView.as_view(), name='admin_user_delete'),
     path('admin/stats/', AdminStatsView.as_view(), name='admin_stats'),
+
+    # Indian Kanoon (Case Law Search)
+    path('ik/search/', IKSearchView.as_view(), name='ik_search'),
+    path('ik/doc/<int:docid>/', IKDocView.as_view(), name='ik_doc'),
+    path('ik/doc/<int:docid>/citations/', IKCitationsView.as_view(), name='ik_citations'),
+    path('ik/doc/<int:docid>/citedby/', IKCitedByView.as_view(), name='ik_citedby'),
+
+    # Constitution Search (DB-backed)
+    path('constitution/search/', ConstitutionSearchView.as_view(), name='constitution_search'),
 ]

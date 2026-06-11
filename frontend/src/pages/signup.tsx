@@ -207,19 +207,21 @@ function GoogleSignInButton({ onSuccess, onError, label = "Continue with Google"
     <button
       ref={btnRef}
       onClick={handleClick}
+      disabled={!sdkReady}
       style={{
         width: "100%", display: "flex", alignItems: "center", justifyContent: "center",
-        gap: 10, padding: "11px 20px", background: "#fff",
-        border: "1.5px solid #E5E7EB", borderRadius: 10, cursor: "pointer",
-        fontSize: 14, fontWeight: 600, color: "#374151",
+        gap: 10, padding: "11px 20px", background: sdkReady ? "#fff" : "#F3F4F6",
+        border: "1.5px solid #E5E7EB", borderRadius: 10, cursor: sdkReady ? "pointer" : "not-allowed",
+        fontSize: 14, fontWeight: 600, color: sdkReady ? "#374151" : "#9CA3AF",
         fontFamily: "inherit", transition: "all 0.2s",
         boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+        opacity: sdkReady ? 1 : 0.6,
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = "#F9FAFB"; e.currentTarget.style.borderColor = "#D1D5DB"; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.borderColor = "#E5E7EB"; }}
+      onMouseEnter={(e) => { if (sdkReady) { e.currentTarget.style.background = "#F9FAFB"; e.currentTarget.style.borderColor = "#D1D5DB"; } }}
+      onMouseLeave={(e) => { if (sdkReady) { e.currentTarget.style.background = "#fff"; e.currentTarget.style.borderColor = "#E5E7EB"; } }}
     >
       <GoogleIcon />
-      {label}
+      {sdkReady ? label : "Loading Google…"}
     </button>
   );
 }

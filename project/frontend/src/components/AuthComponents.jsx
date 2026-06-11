@@ -105,25 +105,37 @@ export function useToast() {
 }
 
 // ─── Shared Input component ───────────────────────────────────────────────────
-export function Input({ label, type = "text", value, onChange, placeholder, error, hint, rightEl, required }) {
+export function Input({ label, type = "text", value, onChange, placeholder, error, hint, rightEl, required, id }) {
+  const generatedId = React.useId();
+  const inputId = id || generatedId;
+
   return (
     <div style={{ marginBottom: error ? 6 : 16 }}>
-      <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 6 }}>
+      <label htmlFor={inputId} style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 6 }}>
         {label}{required && <span style={{ color: "#EF4444", marginLeft: 3 }}>*</span>}
       </label>
       <div style={{ position: "relative" }}>
         <input
+          id={inputId}
           type={type} value={value} onChange={onChange} placeholder={placeholder} autoComplete="off"
           style={{
             width: "100%", padding: rightEl ? "11px 44px 11px 14px" : "11px 14px",
             border: `1.5px solid ${error ? "#FCA5A5" : "#E5E7EB"}`,
             borderRadius: 10, fontSize: 14, color: "#111827",
-            background: error ? "#FFF5F5" : "#FAFAFA",
-            outline: "none", fontFamily: "inherit", transition: "border 0.2s, background 0.2s",
-            boxSizing: "border-box",
+            background: error ? "#FFF5F5" : "rgba(255,255,255,0.7)",
+            outline: "none", fontFamily: "inherit", transition: "all 0.3s ease",
+            boxSizing: "border-box", backdropFilter: "blur(10px)",
           }}
-          onFocus={(e) => { e.target.style.border = `1.5px solid ${error ? "#EF4444" : "#6366F1"}`; e.target.style.background = "#fff"; }}
-          onBlur={(e) => { e.target.style.border = `1.5px solid ${error ? "#FCA5A5" : "#E5E7EB"}`; e.target.style.background = error ? "#FFF5F5" : "#FAFAFA"; }}
+          onFocus={(e) => { 
+            e.target.style.border = `1.5px solid ${error ? "#EF4444" : "#6366F1"}`; 
+            e.target.style.background = "#fff"; 
+            e.target.style.boxShadow = error ? "0 0 0 4px rgba(239, 68, 68, 0.1)" : "0 0 0 4px rgba(99, 102, 241, 0.15)";
+          }}
+          onBlur={(e) => { 
+            e.target.style.border = `1.5px solid ${error ? "#FCA5A5" : "#E5E7EB"}`; 
+            e.target.style.background = error ? "#FFF5F5" : "rgba(255,255,255,0.7)"; 
+            e.target.style.boxShadow = "none";
+          }}
         />
         {rightEl && (
           <div style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "#9CA3AF", cursor: "pointer" }}>
@@ -131,8 +143,8 @@ export function Input({ label, type = "text", value, onChange, placeholder, erro
           </div>
         )}
       </div>
-      {error && <p style={{ margin: "4px 0 10px", fontSize: 12, color: "#EF4444" }}>{error}</p>}
-      {hint && !error && <p style={{ margin: "4px 0 10px", fontSize: 12, color: "#9CA3AF" }}>{hint}</p>}
+      {error && <p id={`${inputId}-error`} role="alert" style={{ margin: "4px 0 10px", fontSize: 12, color: "#EF4444" }}>{error}</p>}
+      {hint && !error && <p id={`${inputId}-hint`} style={{ margin: "4px 0 10px", fontSize: 12, color: "#9CA3AF" }}>{hint}</p>}
     </div>
   );
 }

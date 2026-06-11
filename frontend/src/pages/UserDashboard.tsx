@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Sidebar, Toast, useToast, Modal } from '../components/index';
@@ -18,7 +18,10 @@ export default function UserDashboard() {
   const [histLoading, setHistLoading] = useState(true);
   const [emailModal, setEmailModal] = useState(false);
   const [emailAddr, setEmailAddr] = useState('');
+  const [attachPdf, setAttachPdf] = useState(true);
+  const [showPreview, setShowPreview] = useState(false);
   const [sending, setSending] = useState(false);
+  const [attachment, setAttachment] = useState<File | null>(null);
 
   const sidebar = [
     { label:'Dashboard', path:'/dashboard', icon:'🏠' },
@@ -55,9 +58,20 @@ export default function UserDashboard() {
   const handleEmail = async () => {
     setSending(true);
     try {
-      await emailAPI.send({ to_email:emailAddr, email_type:'advice', content:{ query:advice?.query, ...advice?.ai_response } });
-      setEmailModal(false); showToast('Email sent & logged','success');
-    } catch { showToast('Email failed','error'); } finally { setSending(false); }
+      const content = advice?.ai_response
+        ? { query: advice.query, ...advice.ai_response }
+        : { query: advice?.query };
+      await emailAPI.send({
+        to_email:   emailAddr,
+        email_type: 'advice',
+        content,
+        attach_pdf: attachPdf,
+        attachment,
+      });
+      setEmailModal(false);
+      setAttachment(null);
+      showToast('Email sent ✓', 'success');
+    } catch { showToast('Email failed', 'error'); } finally { setSending(false); }
   };
 
   const ai = advice?.ai_response || advice;
@@ -206,16 +220,112 @@ export default function UserDashboard() {
 
       {/* Email modal */}
       {emailModal && (
-        <Modal title="Email Legal Advice" onClose={()=>setEmailModal(false)}>
-          <p className="text-slate-400 text-sm mb-4">Send this advice summary to an email address.</p>
+        <Modal title="" onClose={()=>{ setEmailModal(false); setShowPreview(false); }}>
+          {/* Header */}
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+              style={{ background:'linear-gradient(135deg,#4f6ef7,#7c3aed)' }}>
+              <span className="text-lg">📧</span>
+            </div>
+            <div>
+              <h3 className="text-white font-bold text-base">Email this Legal Advice</h3>
+              <p className="text-slate-400 text-xs mt-0.5">Send to any email address</p>
+            </div>
+          </div>
+
+          {/* Content type badge */}
+          <div className="mb-4">
+            <span className="text-xs px-3 py-1 rounded-full font-medium"
+              style={{ background:'rgba(79,110,247,.15)', color:'#818cf8', border:'1px solid rgba(79,110,247,.3)' }}>
+              Legal Advice Payload
+            </span>
+          </div>
+
+          {/* Recipient */}
+          <label className="block text-slate-300 text-xs font-semibold mb-1.5">Recipient Email</label>
           <input value={emailAddr} onChange={e=>setEmailAddr(e.target.value)} type="email"
-            className="input-field mb-5" placeholder="recipient@example.com" />
+            className="input-field mb-4" placeholder="recipient@example.com" />
+
+          {/* Attach PDF toggle */}
+          <div className="flex items-center justify-between p-4 rounded-xl mb-4"
+            style={{ background:'rgba(79,110,247,.05)', border:'1px solid rgba(79,110,247,.15)' }}>
+            <div>
+              <p className="text-slate-200 text-sm font-medium">Attach as PDF</p>
+              <p className="text-slate-500 text-xs mt-0.5">A PDF copy will be attached</p>
+            </div>
+            <button onClick={()=>setAttachPdf(p=>!p)}
+              className="relative w-12 h-6 rounded-full transition-all duration-200 flex-shrink-0"
+              style={{ background: attachPdf ? 'linear-gradient(90deg,#4f6ef7,#7c3aed)' : 'rgba(100,116,139,.3)' }}>
+              <span className="absolute top-0.5 transition-all duration-200 w-5 h-5 rounded-full bg-white shadow"
+                style={{ left: attachPdf ? '26px' : '2px' }} />
+            </button>
+          </div>
+
+          {/* Local Attachment */}
+          <div className="p-4 rounded-xl mb-4"
+            style={{ background:'rgba(79,110,247,.05)', border:'1px solid rgba(79,110,247,.15)' }}>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-slate-200 text-sm font-medium">Local Attachment</p>
+              <input 
+                type="file" 
+                id="file-upload" 
+                className="hidden" 
+                onChange={e => setAttachment(e.target.files?.[0] || null)} 
+              />
+              <label 
+                htmlFor="file-upload"
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/20"
+              >
+                {attachment ? 'Change File' : 'Select File'}
+              </label>
+            </div>
+            {attachment ? (
+              <div className="flex items-center justify-between bg-slate-800/50 p-2 rounded-lg border border-slate-700">
+                <div className="flex items-center gap-2 overflow-hidden">
+                  <span className="text-lg">📄</span>
+                  <div className="overflow-hidden">
+                    <p className="text-slate-200 text-[10px] font-medium truncate">{attachment.name}</p>
+                    <p className="text-slate-500 text-[9px]">{(attachment.size / 1024).toFixed(1)} KB</p>
+                  </div>
+                </div>
+                <button onClick={()=>setAttachment(null)} className="text-slate-400 hover:text-red-400 transition-colors">
+                  <span className="text-base">✕</span>
+                </button>
+              </div>
+            ) : (
+              <p className="text-slate-500 text-[10px]">Attach extra files from your computer</p>
+            )}
+          </div>
+
+          {/* Content preview */}
+          <button onClick={()=>setShowPreview(p=>!p)}
+            className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors mb-4 flex items-center gap-1">
+            <span>{showPreview ? '▾' : '▸'}</span>
+            {showPreview ? 'Hide' : 'Preview'} content
+          </button>
+
+          {showPreview && ai && (
+            <div className="mb-4 p-3 rounded-xl text-xs space-y-2 max-h-40 overflow-y-auto"
+              style={{ background:'rgba(15,23,42,.6)', border:'1px solid rgba(79,110,247,.15)' }}>
+              {ai.constitution_reference && <p className="text-slate-300"><span className="text-indigo-400 font-semibold">Law: </span>{ai.constitution_reference}</p>}
+              {ai.applicable_law        && <p className="text-slate-300"><span className="text-indigo-400 font-semibold">Act: </span>{ai.applicable_law}</p>}
+              {ai.steps_to_take?.slice(0,3).map((s:string,i:number)=>(
+                <p key={i} className="text-slate-400">• {s}</p>
+              ))}
+              {(ai.steps_to_take?.length||0)>3 && <p className="text-slate-500">…and {ai.steps_to_take.length-3} more steps</p>}
+            </div>
+          )}
+
+          {/* Actions */}
           <div className="flex gap-3">
-            <button onClick={()=>setEmailModal(false)} className="flex-1 py-2.5 rounded-xl text-sm text-slate-300"
+            <button onClick={()=>{ setEmailModal(false); setShowPreview(false); }}
+              className="flex-1 py-2.5 rounded-xl text-sm text-slate-300 transition-all"
               style={{ border:'1px solid rgba(79,110,247,.2)', background:'rgba(15,29,58,.5)' }}>Cancel</button>
             <button onClick={handleEmail} disabled={sending||!emailAddr}
-              className="flex-1 btn-glow text-white py-2.5 rounded-xl text-sm font-medium">
-              {sending?'Sending…':'Send Email'}
+              className="flex-1 btn-glow text-white py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2">
+              {sending
+                ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Sending…</>
+                : <>{attachPdf ? '📎' : '📧'} Send Email</>}
             </button>
           </div>
         </Modal>

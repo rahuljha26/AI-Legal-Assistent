@@ -5,6 +5,8 @@ import SignUp   from "./pages/SignUp";
 import UserDashboard     from "./pages/UserDashboard";
 import AdvocateDashboard from "./pages/AdvocateDashboard";
 import AdminDashboard    from "./pages/AdminDashboard";
+import DocumentGenerator from "./pages/DocumentGenerator";
+import { ChatWidget } from "./components";
 
 function ProtectedRoute({ children, roles }: { children: React.ReactNode; roles?: string[] }) {
   const { isLoggedIn, isLoading, user } = useAuth();
@@ -15,7 +17,12 @@ function ProtectedRoute({ children, roles }: { children: React.ReactNode; roles?
     if (user.role === "advocate") return <Navigate to="/advocate/dashboard" replace />;
     return <Navigate to="/dashboard" replace />;
   }
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <ChatWidget />
+    </>
+  );
 }
 
 function SmartRedirect() {
@@ -48,6 +55,13 @@ export default function App() {
           <Route path="/advocate/dashboard" element={
             <ProtectedRoute roles={["advocate"]}>
               <AdvocateDashboard />
+            </ProtectedRoute>
+          } />
+
+          {/* Protected: documents */}
+          <Route path="/documents" element={
+            <ProtectedRoute roles={["user","advocate"]}>
+              <DocumentGenerator />
             </ProtectedRoute>
           } />
 

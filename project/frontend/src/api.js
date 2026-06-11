@@ -46,8 +46,15 @@ export const authAPI = {
 
 export const adviceAPI = {
   // Backend returns: { success, message, data: { id, query, ai_response, ... } }
-  ask:     (data) => API.post('/advice/ask/', data),
+  ask: (data) => {
+    if (data instanceof FormData) {
+      return API.post('/advice/ask/', data, { headers: { 'Content-Type': 'multipart/form-data' } });
+    }
+    return API.post('/advice/ask/', data);
+  },
   history: ()     => API.get('/advice/history/'),
+  pdf:     (id)   => API.get(`/advice/${id}/pdf/`, { responseType: 'blob' }),
+  delete:  (id)   => API.delete(`/advice/${id}/`),
 };
 
 export const documentAPI = {
@@ -56,5 +63,14 @@ export const documentAPI = {
   list:     ()     => API.get('/documents/'),
   pdf:      (id)   => API.get(`/documents/${id}/pdf/`, { responseType: 'blob' }),
 };
+
+export const ikAPI = {
+  // Indian Kanoon Case Law Search
+  search:    (params)        => API.get('/ik/search/', { params }),
+  getDoc:    (docid, params) => API.get(`/ik/doc/${docid}/`, { params }),
+  citations: (docid)         => API.get(`/ik/doc/${docid}/citations/`),
+  citedBy:   (docid)         => API.get(`/ik/doc/${docid}/citedby/`),
+};
+
 
 export default API;

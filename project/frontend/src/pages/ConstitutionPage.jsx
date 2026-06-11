@@ -1,34 +1,83 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import Sidebar from '../components/Sidebar';
+import api from '../api';
 
-const CONSTITUTION_DATA = [
-  { num:'Article 14', title:'Right to Equality', desc:'The State shall not deny to any person equality before the law or the equal protection of the laws within the territory of India.', tags:['Fundamental Rights','Part III'], full:'Article 14 guarantees equality before law and equal protection of laws to all persons. It prohibits class legislation but permits reasonable classification. The State cannot discriminate between equals.' },
-  { num:'Article 19', title:'Right to Freedom', desc:'All citizens shall have the right to freedom of speech and expression, to assemble peaceably, to form associations, to move freely…', tags:['Fundamental Rights','Part III'], full:'Article 19 guarantees six freedoms to citizens: speech & expression, peaceful assembly, association, movement, residence, and profession. These rights can be reasonably restricted by the State.' },
-  { num:'Article 21', title:'Right to Life and Personal Liberty', desc:'No person shall be deprived of his life or personal liberty except according to procedure established by law.', tags:['Fundamental Rights','Part III'], full:'Article 21 is the most expansive fundamental right. It includes right to live with dignity, right to livelihood, right to privacy, right to health, right to education (via Article 21A), and protection against arbitrary state action.' },
-  { num:'Article 32', title:'Right to Constitutional Remedies', desc:'The right to move the Supreme Court by appropriate proceedings for the enforcement of the rights conferred by this Part.', tags:['Fundamental Rights','Part III'], full:'Article 32 is the "heart and soul" of the Constitution (Dr. B.R. Ambedkar). It gives citizens the right to approach the Supreme Court directly for enforcement of fundamental rights via writs.' },
-  { num:'IPC 420', title:'Cheating and Dishonestly Inducing', desc:'Whoever cheats and thereby dishonestly induces the person deceived to deliver any property shall be punished.', tags:['IPC Sections','Criminal Law'], full:'IPC Section 420 deals with cheating. Punishment: imprisonment up to 7 years and fine. It requires deceit, dishonest inducement, and delivery of property or alteration of documents.' },
+// ─── Filter categories matching the DB tags ──────────────────────────────────
+const FILTERS = [
+  'All',
+  'Fundamental Rights',
+  'Directive Principles',
+  'Fundamental Duties',
+  'Right to Equality',
+  'Right to Freedom',
+  'Right to Life',
+  'Emergency Provisions',
+  'Union',
+  'States',
+  'Parliament',
+  'Judiciary',
+  'Supreme Court',
+  'High Court',
+  'Elections',
+  'Citizenship',
+  'Preamble',
 ];
 
-const FILTERS = ['All','Fundamental Rights','IPC Sections','Consumer Law','IT Act','Family Law'];
+const QUICK_SEARCHES = [
+  'Article 21', 'Article 14', 'Article 32', 'Right to Life',
+  'Emergency', 'Fundamental Duties', 'Right to Education',
+];
 
 export default function ConstitutionPage() {
-  const [query, setQuery]     = useState('');
-  const [filter, setFilter]   = useState('All');
-  const [results, setResults] = useState([]);
+  const [query, setQuery]       = useState('');
+  const [filter, setFilter]     = useState('All');
+  const [results, setResults]   = useState([]);
   const [selected, setSelected] = useState(null);
   const [searched, setSearched] = useState(false);
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState('');
+  const [meta, setMeta]         = useState({ total: 0, page: 1, pages: 1 });
 
-  const handleSearch = () => {
-    if (!query.trim() && filter === 'All') { setResults([]); setSearched(false); return; }
-    const q = query.toLowerCase();
-    const res = CONSTITUTION_DATA.filter(d => {
-      const matchFilter = filter === 'All' || d.tags.includes(filter);
-      const matchQuery  = !q || d.num.toLowerCase().includes(q) || d.title.toLowerCase().includes(q) || d.desc.toLowerCase().includes(q);
-      return matchFilter && matchQuery;
-    });
-    setResults(res);
-    setSearched(true);
-    setSelected(res[0] || null);
+  const handleSearch = useCallback(async (overrideQuery = null, overrideFilter = null, page = 1) => {
+    const q = (overrideQuery !== null ? overrideQuery : query).trim();
+    const f = overrideFilter !== null ? overrideFilter : filter;
+
+    if (!q && f === 'All') {
+      setResults([]); setSearched(false); return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const params = new URLSearchParams({ page, limit: 20 });
+      if (q)             params.append('q', q);
+      if (f !== 'All')   params.append('filter', f);
+
+      const res = await api.get(`/constitution/search/?${params.toString()}`);
+      const data = res.data?.data || {};
+
+      setResults(data.results || []);
+      setMeta({ total: data.total || 0, page: data.page || 1, pages: data.pages || 1 });
+      setSearched(true);
+      setSelected((data.results || [])[0] || null);
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Failed to fetch results. Please try again.');
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [query, filter]);
+
+  const handleFilterClick = (f) => {
+    setFilter(f);
+    handleSearch(null, f, 1);
+  };
+
+  const handleQuickSearch = (s) => {
+    setQuery(s);
+    setFilter('All');
+    handleSearch(s, 'All', 1);
   };
 
   return (
@@ -36,77 +85,205 @@ export default function ConstitutionPage() {
       <Sidebar />
       <div className="main-content">
         <header className="topbar">
-          <h3>Indian Constitution & Law Search</h3>
+          <h3>⚖️ Indian Constitution &amp; Law Search</h3>
         </header>
 
         <div className="page-body">
-          <p className="text-muted mb-16">Search articles, IPC sections, and legal acts instantly</p>
+          <p className="text-muted mb-16">
+            Search articles from the Constitution of India database — powered by AI context
+          </p>
 
-          {/* Search Bar */}
+          {/* ── Search Bar ─────────────────────────────────────────────────── */}
           <div className="search-bar-wrap">
-            <input className="form-control" placeholder="Search by article number, keyword, or IPC section..." value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleSearch()} style={{ borderRadius:'8px 0 0 8px', borderRight:'none' }} />
-            <button className="btn btn-primary" onClick={handleSearch}>🔍 Search</button>
+            <input
+              className="form-control"
+              placeholder="Search by article number, keyword, or Part (e.g. 'Article 21', 'equality'…)"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSearch()}
+              style={{ borderRadius: '8px 0 0 8px', borderRight: 'none' }}
+            />
+            <button
+              className="btn btn-primary"
+              onClick={() => handleSearch()}
+              disabled={loading}
+            >
+              {loading ? '⏳' : '🔍'} Search
+            </button>
           </div>
-          <div className="filter-pills mt-12">
+
+          {/* ── Filter Chips ────────────────────────────────────────────────── */}
+          <div className="filter-pills mt-12" style={{ flexWrap: 'wrap', gap: 6 }}>
             {FILTERS.map(f => (
-              <span key={f} className={`chip${filter===f?' active':''}`} onClick={()=>{setFilter(f);}}>{f}</span>
+              <span
+                key={f}
+                className={`chip${filter === f ? ' active' : ''}`}
+                onClick={() => handleFilterClick(f)}
+                style={{ cursor: 'pointer' }}
+              >
+                {f}
+              </span>
             ))}
           </div>
 
-          {!searched ? (
-            <div style={{ textAlign:'center', marginTop:80, color:'var(--muted)' }}>
-              <div style={{ fontSize:64, marginBottom:16 }}>📚</div>
-              <h3 style={{ marginBottom:8 }}>Search the Indian Constitution, IPC sections, and legal acts</h3>
-              <p style={{ marginBottom:24 }}>Enter a keyword, article number, or topic above to find relevant laws.</p>
-              <div style={{ display:'flex', gap:8, justifyContent:'center', flexWrap:'wrap' }}>
-                {['Article 21','IPC 420','Consumer Rights'].map(s => (
-                  <span key={s} className="chip" onClick={()=>{setQuery(s);setFilter('All');}}>🔍 {s}</span>
+          {/* ── Error ───────────────────────────────────────────────────────── */}
+          {error && (
+            <div className="card" style={{ background: '#fff1f0', borderColor: '#ff4d4f', marginTop: 16, padding: '12px 16px', color: '#cf1322' }}>
+              ⚠️ {error}
+            </div>
+          )}
+
+          {/* ── Empty State ─────────────────────────────────────────────────── */}
+          {!searched && !loading && (
+            <div style={{ textAlign: 'center', marginTop: 80, color: 'var(--muted)' }}>
+              <div style={{ fontSize: 64, marginBottom: 16 }}>📚</div>
+              <h3 style={{ marginBottom: 8 }}>Search the Indian Constitution</h3>
+              <p style={{ marginBottom: 24 }}>
+                All articles are stored in the database and used as AI context.
+                Enter an article number, keyword, or Part name to begin.
+              </p>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+                {QUICK_SEARCHES.map(s => (
+                  <span
+                    key={s}
+                    className="chip"
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => handleQuickSearch(s)}
+                  >
+                    🔍 {s}
+                  </span>
                 ))}
               </div>
             </div>
-          ) : (
-            <div className="search-layout">
-              {/* Results */}
+          )}
+
+          {/* ── Loading ─────────────────────────────────────────────────────── */}
+          {loading && (
+            <div style={{ textAlign: 'center', marginTop: 60, color: 'var(--muted)' }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>⚖️</div>
+              <p>Searching the Constitution database…</p>
+            </div>
+          )}
+
+          {/* ── Results ─────────────────────────────────────────────────────── */}
+          {searched && !loading && (
+            <div className="search-layout" style={{ marginTop: 24 }}>
+              {/* Left: Result List */}
               <div>
-                <p className="text-sm mb-16">{results.length} result{results.length !== 1 ? 's' : ''} found{query ? ` for "${query}"` : ''}</p>
+                <p className="text-sm mb-16" style={{ color: 'var(--muted)' }}>
+                  {meta.total} article{meta.total !== 1 ? 's' : ''} found
+                  {query ? ` for "${query}"` : ''}
+                  {filter !== 'All' ? ` in "${filter}"` : ''}
+                  {meta.pages > 1 && ` — Page ${meta.page} of ${meta.pages}`}
+                </p>
+
                 {results.length === 0 ? (
-                  <div className="card" style={{ textAlign:'center', color:'var(--muted)', padding:40 }}>
-                    No results found. Try a different search.
+                  <div className="card" style={{ textAlign: 'center', color: 'var(--muted)', padding: 40 }}>
+                    <div style={{ fontSize: 40, marginBottom: 12 }}>🔎</div>
+                    <p>No articles found. Try different keywords or remove the filter.</p>
                   </div>
-                ) : results.map((r, i) => (
-                  <div key={i} className="result-card" onClick={() => setSelected(r)}
-                    style={{ background: selected?.num === r.num ? 'var(--light-blue)' : '#fff', borderColor: selected?.num === r.num ? 'var(--primary)' : 'var(--border)' }}>
-                    <div style={{ display:'flex', alignItems:'flex-start', gap:12 }}>
-                      <span className="badge badge-verified" style={{ flexShrink:0 }}>{r.num}</span>
-                      <div style={{ flex:1 }}>
-                        <div style={{ fontSize:14, fontWeight:600, marginBottom:4 }}>{r.title}</div>
-                        <p className="text-sm" style={{ marginBottom:10 }}>{r.desc.slice(0,120)}…</p>
-                        <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                          {r.tags.map(t => <span key={t} className="chip" style={{ fontSize:11, padding:'2px 8px' }}>{t}</span>)}
+                ) : (
+                  results.map((r, i) => (
+                    <div
+                      key={r.id || i}
+                      className="result-card"
+                      onClick={() => setSelected(r)}
+                      style={{
+                        background: selected?.id === r.id ? 'var(--light-blue)' : '#fff',
+                        borderColor: selected?.id === r.id ? 'var(--primary)' : 'var(--border)',
+                        cursor: 'pointer',
+                        marginBottom: 10,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                        <span className="badge badge-verified" style={{ flexShrink: 0, fontSize: 11 }}>
+                          {r.article_number}
+                        </span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>{r.title}</div>
+                          <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>{r.part}</div>
+                          <p className="text-sm" style={{ marginBottom: 8, lineHeight: 1.5 }}>
+                            {r.short_description.slice(0, 120)}…
+                          </p>
+                          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                            {(r.tags || []).slice(0, 3).map(t => (
+                              <span key={t} className="chip" style={{ fontSize: 10, padding: '2px 6px' }}>{t}</span>
+                            ))}
+                          </div>
                         </div>
+                        <span className="text-primary" style={{ fontSize: 12, flexShrink: 0 }}>View →</span>
                       </div>
-                      <span className="text-primary" style={{ fontSize:12, flexShrink:0 }}>View →</span>
                     </div>
+                  ))
+                )}
+
+                {/* Pagination */}
+                {meta.pages > 1 && (
+                  <div style={{ display: 'flex', gap: 8, marginTop: 16, alignItems: 'center' }}>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      disabled={meta.page <= 1}
+                      onClick={() => handleSearch(null, null, meta.page - 1)}
+                    >
+                      ← Prev
+                    </button>
+                    <span style={{ fontSize: 13, color: 'var(--muted)' }}>
+                      {meta.page} / {meta.pages}
+                    </span>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      disabled={meta.page >= meta.pages}
+                      onClick={() => handleSearch(null, null, meta.page + 1)}
+                    >
+                      Next →
+                    </button>
                   </div>
-                ))}
+                )}
               </div>
 
-              {/* Detail Panel */}
+              {/* Right: Detail Panel */}
               {selected && (
-                <div className="card" style={{ position:'sticky', top:24, height:'fit-content' }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16 }}>
-                    <span className="badge badge-verified">{selected.num}</span>
-                    <div style={{ display:'flex', gap:8, marginLeft:'auto' }}>
-                      <button className="btn btn-ghost btn-sm">🔗</button>
-                      <button className="btn btn-ghost btn-sm">🔖</button>
-                    </div>
+                <div className="card" style={{ position: 'sticky', top: 24, height: 'fit-content', maxHeight: '80vh', overflowY: 'auto' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                    <span className="badge badge-verified" style={{ fontSize: 11 }}>
+                      {selected.article_number}
+                    </span>
+                    <span style={{ fontSize: 11, color: 'var(--muted)', flex: 1 }}>{selected.part}</span>
                   </div>
-                  <h3 className="mb-12">{selected.title}</h3>
-                  <p style={{ fontSize:14, lineHeight:1.8, marginBottom:16, color:'var(--body-text)' }}>{selected.full}</p>
-                  <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:20 }}>
-                    {selected.tags.map(t => <span key={t} className="chip" style={{ fontSize:11 }}>{t}</span>)}
+
+                  <h3 style={{ marginBottom: 8, fontSize: 16 }}>{selected.title}</h3>
+
+                  <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 14 }}>
+                    {(selected.tags || []).map(t => (
+                      <span key={t} className="chip" style={{ fontSize: 10, padding: '2px 6px' }}>{t}</span>
+                    ))}
                   </div>
-                  <button className="btn btn-primary btn-full">Use in AI Advice</button>
+
+                  <div
+                    style={{
+                      fontSize: 13,
+                      lineHeight: 1.85,
+                      color: 'var(--body-text)',
+                      background: '#f8faff',
+                      padding: '14px 16px',
+                      borderRadius: 8,
+                      borderLeft: '3px solid var(--primary)',
+                      marginBottom: 16,
+                      whiteSpace: 'pre-wrap',
+                    }}
+                  >
+                    {selected.full_text}
+                  </div>
+
+                  <button
+                    className="btn btn-primary btn-full"
+                    onClick={() => {
+                      const q = `${selected.article_number}: ${selected.title}`;
+                      window.location.href = `/dashboard?prefill=${encodeURIComponent(q)}`;
+                    }}
+                  >
+                    🤖 Use in AI Advice
+                  </button>
                 </div>
               )}
             </div>

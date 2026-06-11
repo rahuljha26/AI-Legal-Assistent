@@ -13,8 +13,9 @@ import AdvocateDashboard from './pages/AdvocateDashboard';
 import AdminDashboard   from './pages/AdminDashboard';
 import ChatPage         from './pages/ChatPage';
 import DocumentPage     from './pages/DocumentPage';
-import ConstitutionPage from './pages/ConstitutionPage';
+import KnowYourRightsPage from './pages/KnowYourRightsPage';
 import SettingsPage     from './pages/SettingsPage';
+import ChatHistoryPage  from './pages/ChatHistoryPage';
 
 function ProtectedRoute({ children, roles }) {
   const { user, loading } = useAuth();
@@ -40,11 +41,14 @@ function AppRoutes() {
       <Route path="/dashboard/chat" element={
         <ProtectedRoute roles={['user']}><ChatPage /></ProtectedRoute>
       } />
+      <Route path="/dashboard/history" element={
+        <ProtectedRoute roles={['user']}><ChatHistoryPage /></ProtectedRoute>
+      } />
       <Route path="/dashboard/documents" element={
         <ProtectedRoute roles={['user']}><DocumentPage /></ProtectedRoute>
       } />
       <Route path="/dashboard/constitution" element={
-        <ProtectedRoute roles={['user']}><ConstitutionPage /></ProtectedRoute>
+        <ProtectedRoute roles={['user']}><KnowYourRightsPage /></ProtectedRoute>
       } />
       <Route path="/dashboard/settings" element={
         <ProtectedRoute roles={['user']}><SettingsPage /></ProtectedRoute>
@@ -56,11 +60,14 @@ function AppRoutes() {
       <Route path="/advocate/chat" element={
         <ProtectedRoute roles={['advocate']}><ChatPage /></ProtectedRoute>
       } />
+      <Route path="/advocate/history" element={
+        <ProtectedRoute roles={['advocate']}><ChatHistoryPage /></ProtectedRoute>
+      } />
       <Route path="/advocate/documents" element={
         <ProtectedRoute roles={['advocate']}><DocumentPage /></ProtectedRoute>
       } />
       <Route path="/advocate/constitution" element={
-        <ProtectedRoute roles={['advocate']}><ConstitutionPage /></ProtectedRoute>
+        <ProtectedRoute roles={['advocate']}><KnowYourRightsPage /></ProtectedRoute>
       } />
       <Route path="/advocate/settings" element={
         <ProtectedRoute roles={['advocate']}><SettingsPage /></ProtectedRoute>

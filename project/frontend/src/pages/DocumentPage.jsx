@@ -15,15 +15,17 @@ export default function DocumentPage() {
 
   const handleGenerate = async () => {
     setLoading(true);
+    const backendTypes = ['legal_notice', 'affidavit', 'complaint_letter', 'rent_agreement'];
     try {
       const res = await documentAPI.generate({
-        document_type: DOC_TYPES[selected],
+        document_type: backendTypes[selected],
         details: form,
       });
       setPreview(res.data.data.generated_text);
       setDocId(res.data.data.id);
     } catch (err) {
-      setPreview('Error generating document. Please check your API key and try again.');
+      const errMsg = err?.response?.data?.data ? JSON.stringify(err.response.data.data) : 'Error generating document. Please check your API key and try again.';
+      setPreview('Error generating document: ' + errMsg);
     } finally { setLoading(false); }
   };
 

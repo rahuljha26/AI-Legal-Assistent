@@ -22,11 +22,12 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.parsers import MultiPartParser, JSONParser
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from .models import User, AdviceHistory, Document, Case, EmailLog
+from .models import User, AdviceHistory, Document, Case, EmailLog, ConstitutionArticle
 from .serializers import (
     SignupSerializer, LoginSerializer, UserSerializer,
     ChangePasswordSerializer, AdviceAskSerializer, AdviceHistorySerializer,
@@ -270,6 +271,7 @@ class GoogleAuthView(APIView):
 
 class AdviceAskView(APIView):
     permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, JSONParser]
 
     def post(self, request):
         serializer = AdviceAskSerializer(data=request.data)
@@ -289,6 +291,19 @@ class AdviceAskView(APIView):
             )
 
         query = serializer.validated_data['query']
+        file = serializer.validated_data.get('file')
+
+        if file:
+            try:
+                import PyPDF2
+                pdf_reader = PyPDF2.PdfReader(file)
+                pdf_text = ""
+                for page in pdf_reader.pages:
+                    pdf_text += page.extract_text() + "\n"
+                query = f"{query}\n\n[Attached Document Content:]\n{pdf_text}"
+            except Exception as e:
+                return error(f'Error reading PDF file: {str(e)}', status.HTTP_400_BAD_REQUEST)
+
         ai_response = get_gemini_advice(query)
 
         if 'error' in ai_response:
@@ -353,6 +368,64 @@ class AdviceDetailView(APIView):
             return error('Advice not found.', status.HTTP_404_NOT_FOUND)
         advice.delete()
         return success(message='Advice deleted.')
+
+
+class AdvicePDFView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        from django.http import HttpResponse
+        try:
+            advice = AdviceHistory.objects.get(id=pk)
+        except AdviceHistory.DoesNotExist:
+            return error('Advice not found.', status.HTTP_404_NOT_FOUND)
+
+        if advice.user != request.user and not is_admin(request.user):
+            return error('Unauthorized.', status.HTTP_403_FORBIDDEN)
+
+        content = advice.ai_response
+        lines = [
+            "AI LEGAL ADVICE REPORT",
+            "=" * 50,
+            f"Query: {advice.query}",
+            "",
+        ]
+        
+        if content.get('constitution_reference'):
+            lines.append(f"Constitution Reference: {content['constitution_reference']}")
+        if content.get('applicable_law'):
+            lines.append(f"Applicable Law: {content['applicable_law']}")
+            
+        steps = content.get('steps_to_take', [])
+        if steps:
+            lines += ["", "STEPS TO TAKE:", "-" * 30]
+            for i, s in enumerate(steps, 1):
+                lines.append(f"  {i}. {s}")
+                
+        docs = content.get('documents_required', [])
+        if docs:
+            lines += ["", "DOCUMENTS REQUIRED:", "-" * 30]
+            for d in docs:
+                lines.append(f"  • {d}")
+                
+        if content.get('where_to_file'):
+            lines += ["", f"Where to File: {content['where_to_file']}"]
+            
+        if content.get('possible_outcomes'):
+            lines += ["", "Possible Outcomes:", "-" * 30]
+            for o in content['possible_outcomes']:
+                lines.append(f"  • {o}")
+                
+        lines += ["", "-" * 50, content.get('disclaimer', 'This is for informational purposes only. Consult a licensed advocate.')]
+        
+        pdf_text = "\n".join(lines)
+        buffer = create_pdf_buffer(pdf_text)
+        
+        response = HttpResponse(buffer, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="Legal_Advice_{advice.id}.pdf"'
+        return response
+
+
 
 
 # ─── Document Views ───────────────────────────────────────────────────────────
@@ -502,44 +575,132 @@ class EmailSendView(APIView):
 
     def _build_html(self, email_type, content):
         if email_type == 'advice':
+            steps = content.get('steps_to_take', [])
+            docs  = content.get('documents_required', [])
+            steps_html = ''.join(f'<li style="margin-bottom:6px">{s}</li>' for s in steps) if steps else '<li>See attached PDF for details.</li>'
+            docs_html  = ''.join(f'<li>{d}</li>' for d in docs) if docs else ''
             return f"""
-            <html><body style="font-family:sans-serif;padding:20px;">
-            <h2 style="color:#1e3a5f;">AI Legal Advice</h2>
-            <p><strong>Query:</strong> {content.get('query', '')}</p>
-            <p><strong>Applicable Law:</strong> {content.get('applicable_law', '')}</p>
-            <p><strong>Constitution Reference:</strong> {content.get('constitution_reference', '')}</p>
-            <p><em>This is for informational purposes only. Consult a licensed advocate.</em></p>
-            </body></html>"""
-        elif email_type == 'document':
-            return f"""
-            <html><body style="font-family:sans-serif;padding:20px;">
-            <h2 style="color:#1e3a5f;">Generated Legal Document</h2>
-            <pre style="background:#f5f5f5;padding:15px;">{content.get('document_text', '')}</pre>
-            </body></html>"""
-        else:
-            return f"""
-            <html><body style="font-family:sans-serif;padding:20px;">
-            <h2 style="color:#1e3a5f;">Case Summary</h2>
-            <p>{json.dumps(content.get('case_details', content), indent=2)}</p>
+            <html><body style="font-family:Arial,sans-serif;padding:24px;color:#1a1a2e;max-width:620px">
+            <div style="background:linear-gradient(135deg,#1e3a5f,#4f6ef7);padding:20px 24px;border-radius:10px 10px 0 0">
+              <h2 style="color:#fff;margin:0">⚖️ AI Legal Advice</h2>
+              <p style="color:#c7d2fe;margin:4px 0 0;font-size:13px">AI Legal Assistant — Powered by Gemini AI</p>
+            </div>
+            <div style="border:1px solid #e2e8f0;border-top:none;border-radius:0 0 10px 10px;padding:24px">
+              <p><strong>Your Query:</strong><br>{content.get('query', '—')}</p>
+              {'<p><strong>Constitution Reference:</strong> ' + content.get('constitution_reference','') + '</p>' if content.get('constitution_reference') else ''}
+              {'<p><strong>Applicable Law:</strong> ' + content.get('applicable_law','') + '</p>' if content.get('applicable_law') else ''}
+              <h3 style="color:#1e3a5f">Steps to Take</h3>
+              <ol style="padding-left:20px">{steps_html}</ol>
+              {'<h3 style="color:#1e3a5f">Documents Required</h3><ul style="padding-left:20px">' + docs_html + '</ul>' if docs_html else ''}
+              {'<p><strong>Where to File:</strong> ' + content.get('where_to_file','') + '</p>' if content.get('where_to_file') else ''}
+              <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0">
+              <p style="font-size:12px;color:#64748b;font-style:italic">{content.get('disclaimer','This is for informational purposes only. Consult a licensed advocate.')}</p>
+            </div>
             </body></html>"""
 
+        elif email_type == 'document':
+            return f"""
+            <html><body style="font-family:Arial,sans-serif;padding:24px;color:#1a1a2e">
+            <div style="background:linear-gradient(135deg,#1e3a5f,#4f6ef7);padding:20px 24px;border-radius:10px 10px 0 0">
+              <h2 style="color:#fff;margin:0">📄 Generated Legal Document</h2>
+            </div>
+            <div style="border:1px solid #e2e8f0;border-top:none;padding:24px;border-radius:0 0 10px 10px">
+              <pre style="background:#f8f9fa;padding:16px;border-radius:8px;white-space:pre-wrap;font-size:13px">{content.get('document_text', '')}</pre>
+            </div>
+            </body></html>"""
+
+        else:
+            return f"""
+            <html><body style="font-family:Arial,sans-serif;padding:24px">
+            <h2 style="color:#1e3a5f">📋 Case Summary</h2>
+            <pre style="background:#f5f5f5;padding:15px;border-radius:8px">{json.dumps(content.get('case_details', content), indent=2)}</pre>
+            </body></html>"""
+
+    def _build_pdf_text(self, email_type, content):
+        """Generate plain-text representation for PDF attachment."""
+        if email_type == 'advice':
+            lines = [
+                "AI LEGAL ADVICE REPORT",
+                "=" * 50,
+                f"Query: {content.get('query', '')}",
+                "",
+            ]
+            if content.get('constitution_reference'):
+                lines.append(f"Constitution Reference: {content['constitution_reference']}")
+            if content.get('applicable_law'):
+                lines.append(f"Applicable Law: {content['applicable_law']}")
+            steps = content.get('steps_to_take', [])
+            if steps:
+                lines += ["", "STEPS TO TAKE:", "-" * 30]
+                for i, s in enumerate(steps, 1):
+                    lines.append(f"  {i}. {s}")
+            docs = content.get('documents_required', [])
+            if docs:
+                lines += ["", "DOCUMENTS REQUIRED:", "-" * 30]
+                for d in docs:
+                    lines.append(f"  • {d}")
+            if content.get('where_to_file'):
+                lines += ["", f"Where to File: {content['where_to_file']}"]
+            if content.get('possible_outcomes'):
+                lines += ["", "Possible Outcomes:", "-" * 30]
+                for o in content['possible_outcomes']:
+                    lines.append(f"  • {o}")
+            lines += ["", "-" * 50, content.get('disclaimer', 'This is for informational purposes only. Consult a licensed advocate.')]
+            return "\n".join(lines)
+        else:
+            return content.get('document_text', json.dumps(content, indent=2))
+
     def post(self, request):
-        serializer = EmailSendSerializer(data=request.data)
+        # Handle multipart form-data where 'content' might be a JSON string
+        data = request.data.copy()
+        if isinstance(data.get('content'), str):
+            try:
+                import json
+                data['content'] = json.loads(data['content'])
+            except (ValueError, TypeError):
+                pass
+
+        serializer = EmailSendSerializer(data=data)
         if not serializer.is_valid():
             return error('Validation failed.', status.HTTP_400_BAD_REQUEST, serializer.errors)
 
-        data = serializer.validated_data
-        to_email = data['to_email']
-        email_type = data['email_type']
-        content = data['content']
+        data        = serializer.validated_data
+        to_email    = data['to_email']
+        email_type  = data['email_type']
+        content     = data['content']
+        attach_pdf  = data.get('attach_pdf', False)
+        document_id = data.get('document_id')
+        attachment  = data.get('attachment')
+
         subject_map = {
-            'advice': 'Your AI Legal Advice',
-            'document': 'Your Generated Legal Document',
-            'case_summary': 'Case Summary Report',
+            'advice':       'Your AI Legal Advice — AI Legal Assistant',
+            'document':     'Your Generated Legal Document — AI Legal Assistant',
+            'case_summary': 'Case Summary Report — AI Legal Assistant',
         }
-        subject = subject_map.get(email_type, 'AI Legal Assistant')
+        subject   = subject_map.get(email_type, 'AI Legal Assistant')
         html_body = self._build_html(email_type, content)
 
+        # ── Build PDF attachment if requested ─────────────────────────────────
+        pdf_buffer = None
+        pdf_filename = 'legal_advice.pdf'
+
+        if attach_pdf:
+            try:
+                if document_id:
+                    # Attach existing document PDF
+                    doc = Document.objects.filter(id=document_id, user=request.user).first()
+                    if doc:
+                        pdf_buffer   = create_pdf_buffer(doc.generated_text)
+                        pdf_filename = f"{doc.document_type}.pdf"
+                else:
+                    # Generate a fresh PDF from the advice content
+                    pdf_text     = self._build_pdf_text(email_type, content)
+                    pdf_buffer   = create_pdf_buffer(pdf_text)
+                    pdf_filename = f"legal_{email_type}.pdf"
+            except Exception:
+                pass  # If PDF generation fails, still send the HTML email
+
+        # ── Log ───────────────────────────────────────────────────────────────
         email_log = EmailLog.objects.create(
             user=request.user,
             to_email=to_email,
@@ -548,14 +709,42 @@ class EmailSendView(APIView):
             status='pending',
         )
 
+        # ── Send ──────────────────────────────────────────────────────────────
+        from email.mime.base import MIMEBase
+        from email import encoders
+
         sent = False
         for attempt in range(3):
             try:
-                msg = MIMEMultipart('alternative')
+                # Use 'mixed' so we can attach binary files
+                msg = MIMEMultipart('mixed')
                 msg['Subject'] = subject
-                msg['From'] = settings.EMAIL_HOST_USER
-                msg['To'] = to_email
-                msg.attach(MIMEText(html_body, 'html'))
+                msg['From']    = f"{request.user.full_name} <{settings.EMAIL_HOST_USER}>"
+                msg['To']      = to_email
+                msg['Reply-To'] = request.user.email
+
+                # HTML body wrapped in a 'related' part
+                alt = MIMEMultipart('alternative')
+                alt.attach(MIMEText(html_body, 'html'))
+                msg.attach(alt)
+
+                # PDF attachment
+                if pdf_buffer:
+                    pdf_buffer.seek(0)
+                    part = MIMEBase('application', 'octet-stream')
+                    part.set_payload(pdf_buffer.read())
+                    encoders.encode_base64(part)
+                    part.add_header('Content-Disposition', f'attachment; filename="{pdf_filename}"')
+                    msg.attach(part)
+
+                # Custom user attachment
+                if attachment:
+                    attachment.seek(0)
+                    part = MIMEBase('application', 'octet-stream')
+                    part.set_payload(attachment.read())
+                    encoders.encode_base64(part)
+                    part.add_header('Content-Disposition', f'attachment; filename="{attachment.name}"')
+                    msg.attach(part)
 
                 with smtplib.SMTP(settings.EMAIL_HOST, settings.EMAIL_PORT) as server:
                     server.starttls()
@@ -571,8 +760,10 @@ class EmailSendView(APIView):
         email_log.save()
 
         if sent:
-            return success(message='Email sent successfully.')
+            msg_text = 'Email sent with PDF attachment.' if pdf_buffer else 'Email sent successfully.'
+            return success(message=msg_text)
         return error('Failed to send email after 3 attempts.', status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
 # ─── Admin Views ──────────────────────────────────────────────────────────────
@@ -698,3 +889,206 @@ def loginPage(req):
 
     context = {"message": message}
     return render(req, 'login.html', context=context)
+
+
+# ─── Indian Kanoon (IKAPI) Views ──────────────────────────────────────────────
+from .ikapi_service import get_ik_service
+
+
+class IKSearchView(APIView):
+    """
+    GET /api/v1/ik/search/
+
+    Query params:
+      q        – search query (required)
+      page     – page number (0-indexed, default 0)
+      fromdate – DD-MM-YYYY
+      todate   – DD-MM-YYYY
+      sortby   – mostrecent | leastrecent
+      doctype  – filter by document type
+
+    Returns list of matching cases from Indian Kanoon.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        q = request.query_params.get('q', '').strip()
+        if not q:
+            return error('Query parameter "q" is required.', status.HTTP_400_BAD_REQUEST)
+
+        try:
+            page     = int(request.query_params.get('page', 0))
+            maxpages = int(request.query_params.get('maxpages', 1))
+        except ValueError:
+            page, maxpages = 0, 1
+
+        svc = get_ik_service(
+            maxpages = min(maxpages, 5),
+            sortby   = request.query_params.get('sortby', ''),
+            fromdate = request.query_params.get('fromdate', ''),
+            todate   = request.query_params.get('todate', ''),
+        )
+        if svc is None:
+            return error(
+                'Indian Kanoon API token is not configured. Add INDIANKANOON_API_TOKEN to your .env file.',
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        result = svc.search_query(q, pagenum=page, maxpages=min(maxpages, 5))
+
+        if 'error' in result:
+            return error(result['error'], status.HTTP_502_BAD_GATEWAY)
+
+        return success(data=result, message=f'Found {result.get("found", 0)} results.')
+
+
+class IKDocView(APIView):
+    """
+    GET /api/v1/ik/doc/<docid>/
+
+    Fetch full judgment text and metadata for an Indian Kanoon document.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, docid):
+        svc = get_ik_service()
+        if svc is None:
+            return error(
+                'Indian Kanoon API token is not configured.',
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        maxcites   = int(request.query_params.get('maxcites', 5))
+        maxcitedby = int(request.query_params.get('maxcitedby', 5))
+
+        result = svc.get_document(docid, maxcites=maxcites, maxcitedby=maxcitedby)
+
+        if 'error' in result:
+            return error(result['error'], status.HTTP_502_BAD_GATEWAY)
+
+        return success(data=result, message='Document retrieved from Indian Kanoon.')
+
+
+class IKCitationsView(APIView):
+    """
+    GET /api/v1/ik/doc/<docid>/citations/
+
+    Cases that this document cites (outgoing references).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, docid):
+        svc = get_ik_service()
+        if svc is None:
+            return error(
+                'Indian Kanoon API token is not configured.',
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        result = svc.get_citations(docid)
+
+        if 'error' in result:
+            return error(result['error'], status.HTTP_502_BAD_GATEWAY)
+
+        return success(
+            data=result,
+            message=f'Found {result.get("found", 0)} cases cited by document {docid}.',
+        )
+
+
+class IKCitedByView(APIView):
+    """
+    GET /api/v1/ik/doc/<docid>/citedby/
+
+    Cases that cite this document (incoming references / later judgments).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, docid):
+        svc = get_ik_service()
+        if svc is None:
+            return error(
+                'Indian Kanoon API token is not configured.',
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        result = svc.get_cited_by(docid)
+
+        if 'error' in result:
+            return error(result['error'], status.HTTP_502_BAD_GATEWAY)
+
+        return success(
+            data=result,
+            message=f'Found {result.get("found", 0)} cases citing document {docid}.',
+        )
+
+
+# ─── Constitution Search View ─────────────────────────────────────────────────
+
+class ConstitutionSearchView(APIView):
+    """
+    GET /api/v1/constitution/search/
+
+    Query params:
+      q      – search keyword(s), article number, or topic (optional)
+      filter – Part/tag filter, e.g. 'Fundamental Rights', 'DPSP', 'Emergency Provisions'
+      page   – page number (default 1)
+      limit  – results per page (default 20, max 50)
+
+    Returns matching ConstitutionArticle records from the database.
+    Also used by Gemini AI as context for legal advice queries.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from django.db.models import Q
+
+        q           = request.query_params.get('q', '').strip()
+        tag_filter  = request.query_params.get('filter', '').strip()
+        page        = max(1, int(request.query_params.get('page', 1)))
+        limit       = min(50, max(1, int(request.query_params.get('limit', 20))))
+
+        qs = ConstitutionArticle.objects.all()
+
+        # Apply tag/part filter
+        if tag_filter and tag_filter.lower() != 'all':
+            qs = qs.filter(tags__icontains=tag_filter)
+
+        # Apply keyword search
+        if q:
+            qs = qs.filter(
+                Q(article_number__icontains=q) |
+                Q(title__icontains=q) |
+                Q(short_description__icontains=q) |
+                Q(full_text__icontains=q) |
+                Q(part__icontains=q)
+            )
+
+        total  = qs.count()
+        start  = (page - 1) * limit
+        items  = qs[start:start + limit]
+
+        results = [
+            {
+                'id':                a.id,
+                'article_number':    a.article_number,
+                'title':             a.title,
+                'part':              a.part,
+                'part_number':       a.part_number,
+                'tags':              a.tags,
+                'short_description': a.short_description,
+                'full_text':         a.full_text,
+            }
+            for a in items
+        ]
+
+        return success(
+            data={
+                'results': results,
+                'total':   total,
+                'page':    page,
+                'pages':   (total + limit - 1) // limit if total else 1,
+                'has_next': start + limit < total,
+            },
+            message=f'Found {total} article(s) matching your query.'
+        )

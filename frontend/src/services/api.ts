@@ -100,13 +100,17 @@ export const caseAPI = {
 
 // ── Email API ─────────────────────────────────────────────────────────────────
 export const emailAPI = {
-  send: (data: {
-    to_email: string;
-    email_type: string;
-    content: Record<string, unknown>;
-    attach_pdf?: boolean;
-    document_id?: number;
-  }) => api.post('/email/send/', data),
+  send: (data: any) => {
+    if (data.attachment) {
+      const fd = new FormData();
+      Object.keys(data).forEach(k => {
+        if (k === 'content') fd.append(k, JSON.stringify(data[k]));
+        else fd.append(k, data[k]);
+      });
+      return api.post('/email/send/', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+    }
+    return api.post('/email/send/', data);
+  },
 };
 
 // ── Admin API ─────────────────────────────────────────────────────────────────

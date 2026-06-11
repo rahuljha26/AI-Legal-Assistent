@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Sidebar, Toast, useToast, Modal } from '../components/index';
@@ -15,7 +15,6 @@ export default function AdminDashboard() {
   const [roleFilter, setRoleFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<number|null>(null);
-  const [activeTab, setActiveTab] = useState<'overview'|'users'>('overview');
 
   const sidebar = [
     { label:'Dashboard', path:'/admin/dashboard', icon:'🏠' },

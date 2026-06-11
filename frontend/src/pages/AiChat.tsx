@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Sidebar, Toast, useToast, Modal } from '../components/index';
@@ -24,6 +24,8 @@ export default function AiChat() {
   const [loading, setLoading] = useState(false);
   const [emailModal, setEmailModal] = useState<any>(null);
   const [emailAddr, setEmailAddr] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [attachPdf, setAttachPdf] = useState(true);
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -51,9 +53,29 @@ export default function AiChat() {
   };
 
   const handleEmail = async () => {
+    setEmailError('');
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailAddr)) {
+      setEmailError('Please enter a valid email address');
+      return;
+    }
+
     setSending(true);
-    try { await emailAPI.send({ to_email:emailAddr, email_type:'advice', content:{ ...emailModal } }); setEmailModal(null); showToast('Email logged in MongoDB','success'); }
-    catch { showToast('Email failed','error'); } finally { setSending(false); }
+    try {
+      await emailAPI.send({
+        to_email:   emailAddr,
+        email_type: 'advice',
+        content:    { ...emailModal },
+        attach_pdf: attachPdf,
+      });
+      setEmailModal(null);
+      setEmailAddr('');
+      showToast('Email sent successfully ✓', 'success');
+    } catch {
+      showToast('Email failed to send. Please try again.', 'error');
+    } finally {
+      setSending(false);
+    }
   };
 
   const AiBubble = ({ msg }: { msg:Msg }) => {
@@ -214,14 +236,67 @@ export default function AiChat() {
       </main>
 
       {emailModal && (
-        <Modal title="Email Legal Advice" onClose={()=>setEmailModal(null)}>
-          <input value={emailAddr} onChange={e=>setEmailAddr(e.target.value)} type="email"
-            className="input-field mb-4" placeholder="recipient@example.com" />
+        <Modal title="" onClose={()=>setEmailModal(null)}>
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+              style={{ background:'linear-gradient(135deg,#4f6ef7,#7c3aed)' }}>
+              <span className="text-lg">📧</span>
+            </div>
+            <div>
+              <h3 className="text-white font-bold text-base">Email this Legal Advice</h3>
+              <p className="text-slate-400 text-xs mt-0.5">Send to any email address</p>
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <span className="text-xs px-3 py-1 rounded-full font-medium"
+              style={{ background:'rgba(79,110,247,.15)', color:'#818cf8', border:'1px solid rgba(79,110,247,.3)' }}>
+              Legal Advice Payload
+            </span>
+          </div>
+
+          <label className="block text-slate-300 text-xs font-semibold mb-1.5">Recipient Email</label>
+          <input 
+            value={emailAddr} 
+            onChange={e=>{
+              setEmailAddr(e.target.value);
+              if (emailError) setEmailError('');
+            }} 
+            type="email"
+            className="input-field" 
+            placeholder="recipient@example.com"
+            style={{ 
+              marginBottom: emailError ? 4 : 16,
+              borderColor: emailError ? '#ef4444' : 'rgba(79,110,247,0.3)' 
+            }}
+          />
+          {emailError && (
+            <p className="text-red-400 text-[10px] mb-4 ml-1 animate-fade-in">{emailError}</p>
+          )}
+
+          <div className="flex items-center justify-between p-4 rounded-xl mb-5"
+            style={{ background:'rgba(79,110,247,.05)', border:'1px solid rgba(79,110,247,.15)' }}>
+            <div>
+              <p className="text-slate-200 text-sm font-medium">Attach as PDF</p>
+              <p className="text-slate-500 text-xs mt-0.5">A PDF copy will be attached</p>
+            </div>
+            <button onClick={()=>setAttachPdf(p=>!p)}
+              className="relative w-12 h-6 rounded-full transition-all duration-200 flex-shrink-0"
+              style={{ background: attachPdf ? 'linear-gradient(90deg,#4f6ef7,#7c3aed)' : 'rgba(100,116,139,.3)' }}>
+              <span className="absolute top-0.5 transition-all duration-200 w-5 h-5 rounded-full bg-white shadow"
+                style={{ left: attachPdf ? '26px' : '2px' }} />
+            </button>
+          </div>
+
           <div className="flex gap-3">
-            <button onClick={()=>setEmailModal(null)} className="flex-1 py-2.5 rounded-xl text-sm text-slate-300"
+            <button onClick={()=>setEmailModal(null)} className="flex-1 py-2.5 rounded-xl text-sm text-slate-300 transition-all"
               style={{ border:'1px solid rgba(79,110,247,.2)', background:'rgba(15,29,58,.5)' }}>Cancel</button>
             <button onClick={handleEmail} disabled={sending||!emailAddr}
-              className="flex-1 btn-glow text-white py-2.5 rounded-xl text-sm font-medium">{sending?'Sending…':'Send'}</button>
+              className="flex-1 btn-glow text-white py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2">
+              {sending
+                ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Sending…</>
+                : <>{attachPdf ? '📎' : '📧'} Send Email</>}
+            </button>
           </div>
         </Modal>
       )}

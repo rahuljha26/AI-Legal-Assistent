@@ -64,6 +64,7 @@ class ChangePasswordSerializer(serializers.Serializer):
 
 class AdviceAskSerializer(serializers.Serializer):
     query = serializers.CharField(min_length=5, max_length=2000)
+    file = serializers.FileField(required=False)
 
 
 class AdviceHistorySerializer(serializers.ModelSerializer):
@@ -122,6 +123,7 @@ class EmailSendSerializer(serializers.Serializer):
     content = serializers.DictField(required=True)
     attach_pdf = serializers.BooleanField(default=False)
     document_id = serializers.IntegerField(required=False, allow_null=True)
+    attachment = serializers.FileField(required=False, allow_null=True)
 
 
 # ─── Admin Serializers ────────────────────────────────────────────────────────

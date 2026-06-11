@@ -17,6 +17,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  refreshUser: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -69,6 +70,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   };
 
+  // Re-reads the user from localStorage so that profile updates are
+  // immediately reflected in the UI without a full page reload.
+  const refreshUser = () => {
+    const savedUser = localStorage.getItem("user");
+    if (savedUser) {
+      try { setUser(JSON.parse(savedUser)); } catch { /* ignore corrupt data */ }
+    }
+  };
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -76,6 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isLoading,
       login,
       logout,
+      refreshUser,
     }}>
       {children}
     </AuthContext.Provider>

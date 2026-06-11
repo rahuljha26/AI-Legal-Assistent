@@ -14,6 +14,7 @@ from email.mime.multipart import MIMEMultipart
 from datetime import datetime, date
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
+import requests as http_requests
 
 from django.utils import timezone
 from django.conf import settings
@@ -264,6 +265,124 @@ class GoogleAuthView(APIView):
                 "is_new_user": created,
             },
             f"{'Welcome to AI Legal Assistant!' if created else 'Welcome back!'} Signed in with Google.",
+        )
+
+
+class GitHubAuthView(APIView):
+    """
+    POST /api/v1/auth/github/
+    Body: { "code": "<GitHub OAuth authorization code>" }
+
+    Flow:
+      1. Exchange the GitHub authorization code for an access token
+      2. Fetch the authenticated user's profile from GitHub API
+      3. Get the user's primary email (if not public)
+      4. Find or create user in the database
+      5. Return Django JWT access + refresh tokens
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        code = request.data.get("code")
+        if not code:
+            return error("GitHub authorization code is required", 400)
+
+        github_client_id     = settings.GITHUB_CLIENT_ID
+        github_client_secret = settings.GITHUB_CLIENT_SECRET
+
+        if not github_client_id or not github_client_secret:
+            return error("GitHub OAuth is not configured on the server", 500)
+
+        # Step 1: Exchange code for access token
+        token_response = http_requests.post(
+            "https://github.com/login/oauth/access_token",
+            data={
+                "client_id":     github_client_id,
+                "client_secret": github_client_secret,
+                "code":          code,
+            },
+            headers={"Accept": "application/json"},
+            timeout=10,
+        )
+
+        token_data = token_response.json()
+        access_token = token_data.get("access_token")
+
+        if not access_token:
+            return error(
+                f"GitHub token exchange failed: {token_data.get('error_description', 'Unknown error')}",
+                401,
+            )
+
+        gh_headers = {"Authorization": f"token {access_token}", "Accept": "application/json"}
+
+        # Step 2: Fetch GitHub user profile
+        profile_resp = http_requests.get("https://api.github.com/user", headers=gh_headers, timeout=10)
+        if profile_resp.status_code != 200:
+            return error("Failed to fetch GitHub profile", 401)
+
+        profile = profile_resp.json()
+
+        # Step 3: Fetch primary verified email (email may be null in public profile)
+        gh_email = profile.get("email")
+        if not gh_email:
+            emails_resp = http_requests.get(
+                "https://api.github.com/user/emails", headers=gh_headers, timeout=10
+            )
+            if emails_resp.status_code == 200:
+                for entry in emails_resp.json():
+                    if entry.get("primary") and entry.get("verified"):
+                        gh_email = entry["email"]
+                        break
+
+        if not gh_email:
+            return error(
+                "Your GitHub account does not have a verified email address. "
+                "Please add a public verified email on GitHub and try again.",
+                400,
+            )
+
+        gh_email    = gh_email.lower().strip()
+        gh_name     = profile.get("name") or profile.get("login") or "GitHub User"
+        gh_username = profile.get("login", "")
+
+        # Step 4: Find or create user
+        user, created = User.objects.get_or_create(
+            email=gh_email,
+            defaults={
+                "full_name":   gh_name,
+                "role":        "user",
+                "is_verified": True,
+            },
+        )
+
+        if not created:
+            if not user.full_name:
+                user.full_name   = gh_name
+                user.is_verified = True
+                user.save()
+
+        if not user.is_active:
+            return error("Your account has been deactivated. Contact support.", 403)
+
+        # Step 5: Generate Django JWT tokens
+        refresh = RefreshToken.for_user(user)
+
+        return success(
+            {
+                "access":  str(refresh.access_token),
+                "refresh": str(refresh),
+                "user": {
+                    "id":          user.id,
+                    "full_name":   user.full_name,
+                    "email":       user.email,
+                    "role":        user.role,
+                    "is_verified": user.is_verified,
+                },
+                "github_username": gh_username,
+                "is_new_user": created,
+            },
+            f"{'Welcome to AI Legal Assistant!' if created else 'Welcome back!'} Signed in with GitHub.",
         )
 
 

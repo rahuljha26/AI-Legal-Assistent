@@ -1,7 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
-import Login    from "./pages/Login";
-import SignUp   from "./pages/SignUp";
+import Login           from "./pages/Login";
+import SignUp          from "./pages/SignUp";
+import GitHubCallback  from "./pages/GitHubCallback";
 import UserDashboard     from "./pages/UserDashboard";
 import AdvocateDashboard from "./pages/AdvocateDashboard";
 import AdminDashboard    from "./pages/AdminDashboard";
@@ -43,6 +44,9 @@ export default function App() {
           <Route path="/"       element={<SmartRedirect />} />
           <Route path="/login"  element={<Login />} />
           <Route path="/signup" element={<SignUp />} />
+
+          {/* GitHub OAuth callback — loaded in popup, sends code to opener */}
+          <Route path="/oauth/github/callback" element={<GitHubCallback />} />
 
           {/* Protected: citizen */}
           <Route path="/dashboard" element={

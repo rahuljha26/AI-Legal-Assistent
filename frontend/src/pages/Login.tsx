@@ -1,10 +1,11 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import OAuthButtons, { OAuthDivider, type OAuthUser } from "../components/OAuthButtons";
 
 export default function Login() {
   const navigate        = useNavigate();
-  const { login }       = useAuth();
+  const { login, refreshUser } = useAuth();
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [error, setError]       = useState("");
@@ -24,24 +25,18 @@ export default function Login() {
     e.preventDefault();
     setError("");
 
-    // Client-side validation
     if (!email.trim()) { setError("Email is required");    return; }
     if (!password)      { setError("Password is required"); return; }
 
     setLoading(true);
     try {
-      // Call login() — saves tokens to localStorage and updates user state
       await login(email, password);
 
-      // Read role from localStorage immediately after login()
       const savedUser = localStorage.getItem("user");
       if (!savedUser) throw new Error("User data not saved");
 
       const userData = JSON.parse(savedUser);
-      const route    = getDashboardRoute(userData.role);
-
-      // REDIRECT — this is the critical line
-      navigate(route, { replace: true });
+      navigate(getDashboardRoute(userData.role), { replace: true });
 
     } catch (err: unknown) {
       const axiosErr = err as {
@@ -65,12 +60,18 @@ export default function Login() {
     }
   };
 
+  // Called after successful Google or GitHub OAuth
+  const handleOAuthSuccess = (user: OAuthUser) => {
+    refreshUser();
+    navigate(getDashboardRoute(user.role), { replace: true });
+  };
+
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center",
                   justifyContent: "center", background: "#0F172A" }}>
       <div style={{ background: "#1E293B", borderRadius: 16, padding: "40px 36px",
                     width: "100%", maxWidth: 420, border: "1px solid #334155" }}>
-        
+
         <h1 style={{ color: "#fff", fontSize: 24, fontWeight: 700, marginBottom: 8 }}>
           Login
         </h1>
@@ -78,6 +79,17 @@ export default function Login() {
           Sign in to your AI Legal Assistant account
         </p>
 
+        {/* ── OAuth Buttons ─────────────────────────────────────── */}
+        <OAuthButtons
+          onSuccess={handleOAuthSuccess}
+          onError={(msg) => setError(msg)}
+          googleLabel="Continue with Google"
+          githubLabel="Continue with GitHub"
+        />
+
+        <OAuthDivider text="or sign in with email" />
+
+        {/* ── Error banner ──────────────────────────────────────── */}
         {error && (
           <div style={{ background: "#7F1D1D", border: "1px solid #EF4444",
                         color: "#FCA5A5", padding: "12px 16px", borderRadius: 8,

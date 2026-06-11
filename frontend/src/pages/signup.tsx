@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
+import OAuthButtons, { OAuthDivider, type OAuthUser } from "../components/OAuthButtons";
 
-// ─── CONFIG (replace with your real values) ───────────────────────────────────
-const GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com";
-const API_BASE = "http://localhost:8000/api/v1";
+// ─── CONFIG ───────────────────────────────────────────────────────────────────
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 const api = {
@@ -354,11 +354,11 @@ function SignUpPage({ onNavigate }: { onNavigate: (path: string) => void }) {
     }
   };
 
-  const handleGoogleSuccess = (data: any) => {
-    toast(`Welcome, ${data.user.full_name}!`, "success");
+  const handleOAuthSuccess = (user: OAuthUser) => {
+    toast(`Welcome, ${user.full_name}!`, "success");
     setTimeout(() => {
-      if (data.user.role === "admin") window.location.href = "/admin/dashboard";
-      else if (data.user.role === "advocate") window.location.href = "/advocate/dashboard";
+      if (user.role === "admin") window.location.href = "/admin/dashboard";
+      else if (user.role === "advocate") window.location.href = "/advocate/dashboard";
       else window.location.href = "/dashboard";
     }, 1000);
   };
@@ -429,14 +429,15 @@ function SignUpPage({ onNavigate }: { onNavigate: (path: string) => void }) {
                 <p style={{ color: "#6B7280", fontSize: 15, margin: 0 }}>Start your free legal journey today</p>
               </div>
 
-              {/* Google sign-up */}
-              <GoogleSignInButton
-                onSuccess={handleGoogleSuccess}
+              {/* Google + GitHub sign-up */}
+              <OAuthButtons
+                onSuccess={handleOAuthSuccess}
                 onError={(msg) => toast(msg, "error")}
-                label="Sign up with Google"
+                googleLabel="Sign up with Google"
+                githubLabel="Sign up with GitHub"
               />
 
-              <Divider text="or sign up with email" />
+              <OAuthDivider text="or sign up with email" />
 
               <form onSubmit={handleSubmit} noValidate>
                 <Input
@@ -652,10 +653,9 @@ function LoginPage({ onNavigate }: { onNavigate: (path: string) => void }) {
     }
   };
 
-  const handleGoogleSuccess = (data: any) => {
-
-    toast(`Welcome back, ${data.user.full_name}!`, "success");
-    setTimeout(() => redirectByRole(data.user.role), 1000);
+  const handleOAuthSuccess = (user: OAuthUser) => {
+    toast(`Welcome back, ${user.full_name}!`, "success");
+    setTimeout(() => redirectByRole(user.role), 1000);
   };
 
   return (
@@ -711,14 +711,15 @@ function LoginPage({ onNavigate }: { onNavigate: (path: string) => void }) {
             <p style={{ color: "#6B7280", fontSize: 15, margin: 0 }}>Login to your AI Legal Assistant account</p>
           </div>
 
-          {/* Google sign-in */}
-          <GoogleSignInButton
-            onSuccess={handleGoogleSuccess}
+          {/* Google + GitHub sign-in */}
+          <OAuthButtons
+            onSuccess={handleOAuthSuccess}
             onError={(msg) => toast(msg, "error")}
-            label="Continue with Google"
+            googleLabel="Continue with Google"
+            githubLabel="Continue with GitHub"
           />
 
-          <Divider text="or sign in with email" />
+          <OAuthDivider text="or sign in with email" />
 
           <form onSubmit={handleSubmit} noValidate>
             <Input
